@@ -33,8 +33,8 @@ RUN mkdir -p /usr/local/share/npm-global \
   && chown -R node:node /usr/local/share/npm-global
 
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
-ENV PATH=/usr/local/share/npm-global/bin:${PATH}
 ENV HOME=/home/node
+ENV PATH=/home/node/.local/bin:/usr/local/share/npm-global/bin:${PATH}
 
 USER node
 
@@ -46,7 +46,7 @@ RUN npm install -g \
 
 # Anthropic deprecated npm installation for Claude Code; use the native
 # installer so we stay aligned with supported distribution.
-RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}" \
+RUN curl -fsSL https://claude.ai/install.sh | bash -s -- "${CLAUDE_CODE_VERSION}" \
   && mkdir -p /home/node/.codex /home/node/.gemini /home/node/.claude /home/node/.config/claude
 
 USER root
