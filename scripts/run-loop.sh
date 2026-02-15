@@ -617,6 +617,10 @@ start_periodic_scheduler() {
       for pid in "${cycle_pids[@]}"; do
         aid="${pid_to_agent[$pid]}"
         if wait "$pid" 2>/dev/null; then
+          previous_failures="${agent_failure_counts[$aid]:-0}"
+          if [ "$previous_failures" -gt 0 ]; then
+            log "Periodic: ${aid} recovered after ${previous_failures} failed cycle(s)"
+          fi
           agent_failure_counts["$aid"]=0
           agent_next_retry_at["$aid"]=0
           cycle_ok=1
@@ -631,6 +635,10 @@ start_periodic_scheduler() {
         backoff_delay="$(calculate_agent_backoff_delay "$current_failures")"
         retry_at=$((now_epoch + backoff_delay))
         agent_next_retry_at["$aid"]="$retry_at"
+
+        if [ "$current_failures" -eq 1 ]; then
+          log "Periodic: ${aid} entered failure backoff mode"
+        fi
 
         if [ "$backoff_delay" -gt 0 ]; then
           log "Periodic: ${aid} failed (${current_failures}x); cooldown ${backoff_delay}s"
