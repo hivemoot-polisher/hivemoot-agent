@@ -34,6 +34,8 @@ email_domain="${AGENT_GIT_EMAIL_DOMAIN:-agents.local}"
 global_extra_prompt="${AGENT_EXTRA_PROMPT:-}"
 launch_jitter_min="${LAUNCH_JITTER_MIN_SECS:-120}"
 launch_jitter_max="${LAUNCH_JITTER_MAX_SECS:-180}"
+provider="${AGENT_PROVIDER:-claude}"
+auth_mode="${AGENT_AUTH_MODE:-auto}"
 max_agents=10
 token_tmp_root="/tmp/hivemoot-agent-token-files"
 
@@ -47,6 +49,22 @@ if [ "$launch_jitter_max" -lt "$launch_jitter_min" ]; then
   echo "LAUNCH_JITTER_MAX_SECS (${launch_jitter_max}) must be >= LAUNCH_JITTER_MIN_SECS (${launch_jitter_min})" >&2
   exit 1
 fi
+
+case "$auth_mode" in
+  auto|api_key|subscription) ;;
+  *)
+    echo "Unsupported AGENT_AUTH_MODE: ${auth_mode}. Use auto|api_key|subscription." >&2
+    exit 1
+    ;;
+esac
+
+case "$provider" in
+  codex|gemini|claude) ;;
+  *)
+    echo "Unsupported AGENT_PROVIDER: ${provider}. Use codex|gemini|claude." >&2
+    exit 1
+    ;;
+esac
 
 declare -a temp_token_files=()
 shutdown_requested=0
@@ -206,8 +224,6 @@ log "Randomized launch order: ${agent_ids[*]}"
 
 preflight_check() {
   local target_repo="${TARGET_REPO:-}"
-  local provider="${AGENT_PROVIDER:-claude}"
-  local auth_mode="${AGENT_AUTH_MODE:-auto}"
   local prompt_file="${AGENT_PROMPT_FILE:-/opt/hivemoot-agent/prompts/default.md}"
   local failures=0
 
