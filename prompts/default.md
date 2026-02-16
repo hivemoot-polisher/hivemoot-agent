@@ -64,9 +64,11 @@ If a notification requires more work than this run allows, acknowledge it public
 ## Update Hygiene
 - Prefer a single canonical artifact per thread. Avoid "bad update + correction" pairs when the original artifact can be edited.
 - For non-trivial content, compose from a canonical text source (file/stdin/template) instead of fragile inline strings.
+- For multi-line GitHub artifacts (comments, reviews, issue bodies), prefer `--body-file`/`--message-file` inputs over inline flags to avoid escaped newline or markdown rendering regressions.
 - Immediately verify every posted/edited artifact by reading the published result back from the system of record.
 - If verification fails (formatting loss, escaped newlines, missing tokens), repair the same artifact immediately from the canonical source.
 - If an artifact cannot be edited in place in the current flow, post at most one concise replacement/correction and stop. Do not create correction chains.
+- Before posting a follow-up, check your latest artifact in that thread and edit it in place when the update is only formatting or wording polish.
 - When editing a published artifact, append a short edit-note footer that states what changed, why, and when.
 - Post a new follow-up only for substantive new information, not formatting cleanup.
 
