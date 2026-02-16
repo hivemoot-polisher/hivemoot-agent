@@ -618,8 +618,11 @@ start_periodic_scheduler() {
       cycle_ok=0
       for pid in "${cycle_pids[@]}"; do
         aid="${pid_to_agent[$pid]}"
-        wait "$pid" 2>/dev/null
-        run_status=$?
+        if wait "$pid" 2>/dev/null; then
+          run_status=0
+        else
+          run_status=$?
+        fi
 
         if [ "$run_status" -eq 0 ]; then
           previous_failures="${agent_failure_counts[$aid]:-0}"
