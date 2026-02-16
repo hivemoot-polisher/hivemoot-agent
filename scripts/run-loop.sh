@@ -40,6 +40,7 @@ target_repo="${TARGET_REPO:-}"
 max_agents=10
 token_tmp_root="/tmp/hivemoot-agent-token-files"
 lock_dir="/tmp/agent-locks"
+agent_run_busy_exit=3
 
 # Periodic scheduling (backward compat: fall back to BASE_SECS / JITTER_SECS)
 periodic_interval="${PERIODIC_INTERVAL_SECS:-${BASE_SECS:-3600}}"
@@ -366,9 +367,9 @@ trap cleanup EXIT
 trap handle_shutdown TERM INT
 
 # Try to run an agent with per-agent flock.
-# Returns 0 if the agent was busy (lock not acquired) or ran successfully.
-# Returns non-zero only on actual run-once.sh failure, allowing callers
-# to distinguish between "nothing wrong" and "agent run crashed."
+# Returns 0 on successful run-once.sh completion.
+# Returns ${agent_run_busy_exit} when the agent was busy (lock not acquired).
+# Returns non-zero/non-3 on actual run-once.sh failure.
 #
 # Args: agent_id extra_prompt [ack_key state_file]
 # When ack_key + state_file are provided and the run succeeds (exit 0),
@@ -389,7 +390,7 @@ try_run_agent() {
   mkdir -p "$agent_workspace" "$agent_log_dir" "$agent_home"
 
   (
-    flock -n 200 || { log "${agent_id}: busy, skipping"; exit 0; }
+    flock -n 200 || { log "${agent_id}: busy, skipping"; exit "$agent_run_busy_exit"; }
 
     log "${agent_id}: lock acquired, starting run"
 
@@ -613,10 +614,14 @@ start_periodic_scheduler() {
 
       # Wait for all agent runs and track results
       cycle_failures=0
+      cycle_busy=0
       cycle_ok=0
       for pid in "${cycle_pids[@]}"; do
         aid="${pid_to_agent[$pid]}"
-        if wait "$pid" 2>/dev/null; then
+        wait "$pid" 2>/dev/null
+        run_status=$?
+
+        if [ "$run_status" -eq 0 ]; then
           previous_failures="${agent_failure_counts[$aid]:-0}"
           if [ "$previous_failures" -gt 0 ]; then
             log "Periodic: ${aid} recovered after ${previous_failures} failed cycle(s)"
@@ -627,13 +632,20 @@ start_periodic_scheduler() {
           continue
         fi
 
+        if [ "$run_status" -eq "$agent_run_busy_exit" ]; then
+          cycle_busy=$((cycle_busy + 1))
+          log "Periodic: ${aid} busy; keeping existing failure/backoff state"
+          continue
+        fi
+
         cycle_failures=$((cycle_failures + 1))
         current_failures="${agent_failure_counts[$aid]:-0}"
         current_failures=$((current_failures + 1))
         agent_failure_counts["$aid"]="$current_failures"
 
         backoff_delay="$(calculate_agent_backoff_delay "$current_failures")"
-        retry_at=$((now_epoch + backoff_delay))
+        failure_epoch="$(date +%s)"
+        retry_at=$((failure_epoch + backoff_delay))
         agent_next_retry_at["$aid"]="$retry_at"
 
         if [ "$current_failures" -eq 1 ]; then
@@ -651,15 +663,21 @@ start_periodic_scheduler() {
         log "Periodic: no agents eligible this cycle (${cycle_skipped} in cooldown)"
       fi
 
+      if [ "$cycle_busy" -gt 0 ]; then
+        log "Periodic: ${cycle_busy} agent(s) were lock-busy this cycle"
+      fi
+
       if [ "$cycle_ok" -eq 1 ]; then
         consecutive_failures=0
-        log "Periodic: cycle completed (started=${cycle_started} skipped=${cycle_skipped} failed=${cycle_failures})"
+        log "Periodic: cycle completed (started=${cycle_started} skipped=${cycle_skipped} busy=${cycle_busy} failed=${cycle_failures})"
       else
         if [ "$cycle_started" -eq 0 ]; then
           log "Periodic: cycle had no runnable agents; not counting as a failure streak"
+        elif [ "$cycle_failures" -eq 0 ]; then
+          log "Periodic: cycle had no completed runs (busy=${cycle_busy}); not counting as a failure streak"
         else
           consecutive_failures=$((consecutive_failures + 1))
-          log "Periodic: cycle failed (started=${cycle_started} skipped=${cycle_skipped} consecutive_failures=${consecutive_failures})"
+          log "Periodic: cycle failed (started=${cycle_started} skipped=${cycle_skipped} busy=${cycle_busy} consecutive_failures=${consecutive_failures})"
           if [ "$consecutive_failures" -ge "$max_failures" ]; then
             log "Periodic: reached max consecutive failures (${max_failures}); exiting"
             kill -TERM $$ 2>/dev/null || true
