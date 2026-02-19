@@ -67,13 +67,24 @@ if ! effective_auth_mode="$(resolve_effective_auth_mode "$provider" "$auth_mode"
 fi
 
 # Validate numeric settings
-for var_name in periodic_interval periodic_jitter max_failures \
-  agent_failure_backoff_base agent_failure_backoff_max agent_failure_backoff_jitter_pct; do
-  val="${!var_name}"
-  case "$val" in
-    ''|*[!0-9]*) echo "${var_name} must be a non-negative integer" >&2; exit 1 ;;
-  esac
-done
+case "$periodic_interval" in
+  ''|*[!0-9]*) echo "PERIODIC_INTERVAL_SECS must be a non-negative integer" >&2; exit 1 ;;
+esac
+case "$periodic_jitter" in
+  ''|*[!0-9]*) echo "PERIODIC_JITTER_SECS must be a non-negative integer" >&2; exit 1 ;;
+esac
+case "$max_failures" in
+  ''|*[!0-9]*) echo "MAX_CONSECUTIVE_FAILURES must be a non-negative integer" >&2; exit 1 ;;
+esac
+case "$agent_failure_backoff_base" in
+  ''|*[!0-9]*) echo "PERIODIC_AGENT_FAILURE_BACKOFF_BASE_SECS must be a non-negative integer" >&2; exit 1 ;;
+esac
+case "$agent_failure_backoff_max" in
+  ''|*[!0-9]*) echo "PERIODIC_AGENT_FAILURE_BACKOFF_MAX_SECS must be a non-negative integer" >&2; exit 1 ;;
+esac
+case "$agent_failure_backoff_jitter_pct" in
+  ''|*[!0-9]*) echo "PERIODIC_AGENT_FAILURE_BACKOFF_JITTER_PCT must be a non-negative integer" >&2; exit 1 ;;
+esac
 
 if [ "$periodic_interval" -le 0 ]; then
   echo "PERIODIC_INTERVAL_SECS must be > 0" >&2; exit 1
