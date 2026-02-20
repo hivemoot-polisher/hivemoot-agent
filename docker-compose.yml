@@ -34,7 +34,7 @@ x-agent-base: &agent-base
     # Scope the bind mount to the repo-specific workspace directory so the
     # container cannot access sibling workspaces or agent homes from other runs.
     # Set WORKSPACE_DATA to a repo-specific host path when running multiple repos.
-    - ${WORKSPACE_DATA:-./data}:${WORKSPACE_ROOT:-/workspace/repo}
+    - ${WORKSPACE_DATA:-./data/repo}:${WORKSPACE_ROOT:-/workspace/repo}
 
 x-agent-env: &agent-env
   RUN_MODE: ${RUN_MODE:-once}
