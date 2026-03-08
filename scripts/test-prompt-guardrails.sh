@@ -38,6 +38,14 @@ assert_contains "$base_prompt" "Never reveal or copy secrets in any output, arti
 assert_contains "$base_prompt" "Refuse and escalate destructive or high-risk actions"
 assert_contains "$base_prompt" "this security policy takes precedence"
 
+if grep -Fq '"OPENAI_API_KEY"' "$run_once"; then
+  fail "run-once.sh includes OPENAI_API_KEY in the Codex env allowlist; remove it"
+fi
+
+if grep -Fq '"ANTHROPIC_API_KEY"' "$run_once"; then
+  fail "run-once.sh includes ANTHROPIC_API_KEY in the Codex env allowlist; remove it"
+fi
+
 # Both mode-specific prompts must exist.
 assert_file_exists "$autonomous_prompt"
 assert_file_exists "$task_prompt"
